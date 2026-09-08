@@ -1,0 +1,10 @@
+{
+  "name": "tantsaha-radio-serveur",
+  "version": "1.0.0",
+  "description": "Serveur de diffusion audio maison pour Radio TV An'ny Tantsaha — 100% Node.js natif, sans Icecast.",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "dependencies": {}
+}
