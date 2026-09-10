@@ -21,10 +21,14 @@ const path = require('path');
 // ---------------------- Configuration ----------------------
 const PORT = process.env.PORT || 8000;
 const SOURCE_PASSWORD = process.env.SOURCE_PASSWORD || 'tantsaha_source_2026';
-const STATION_NAME = "Radio TV An'ny Tantsaha";
+const STATION_NAME = "Radio An'ny Tantsaha";
 // Taille du "tampon de démarrage" gardé en mémoire pour que les nouveaux
 // auditeurs entendent le son immédiatement au lieu d'un silence.
-const BURST_BUFFER_MAX_BYTES = 400 * 1024; // ~ quelques secondes de MP3 128kbps
+// ⚠️ Ne pas mettre trop gros : ce tampon est envoyé d'un coup à la connexion,
+// donc plus il est gros, plus l'auditeur démarre "en retard" sur le direct.
+// 40 Ko ≈ 1 seconde de MP3 à 320kbps : largement assez pour éviter un silence,
+// sans ajouter de latence perceptible.
+const BURST_BUFFER_MAX_BYTES = 40 * 1024;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 // ---------------------- État en mémoire ----------------------
@@ -61,6 +65,7 @@ function handleSource(req, res, query) {
   liveSince = Date.now();
   recentChunks = [];
   recentBytes = 0;
+  if (req.socket) req.socket.setNoDelay(true);
   log('🔴 Diffusion DÉMARRÉE — flux audio en direct');
 
   // Le serveur garde cette requête ouverte tant que ffmpeg envoie des données.
@@ -90,6 +95,13 @@ function handleSource(req, res, query) {
       recentBytes = 0;
       currentTitle = '';
       log('⏹️  Diffusion ARRÊTÉE');
+      // Ferme proprement chaque auditeur connecté : ça déclenche tout de
+      // suite l'événement de fin côté navigateur, qui relance alors sa
+      // reconnexion automatique au lieu d'attendre un blocage silencieux.
+      for (const listenerRes of listeners) {
+        try { listenerRes.end(); } catch (e) { /* déjà fermé */ }
+      }
+      listeners.clear();
     }
     // Ferme proprement la réponse HTTP vers ffmpeg/curl, sinon la connexion
     // reste ouverte indéfiniment en attente d'une fin de réponse.
@@ -109,12 +121,20 @@ function handleSource(req, res, query) {
 
 // ---------------------- Gestion d'un auditeur ----------------------
 function handleListener(req, res) {
+  // Désactive l'algorithme de Nagle : sans ça, le système d'exploitation
+  // peut retarder l'envoi de petits paquets de quelques dizaines à
+  // quelques centaines de ms en attendant d'en accumuler plus.
+  if (req.socket) req.socket.setNoDelay(true);
+
   res.writeHead(200, {
     'Content-Type': 'audio/mpeg',
     'Transfer-Encoding': 'chunked',
     'Cache-Control': 'no-cache, no-store',
     'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': '*',
+    // Empêche un éventuel proxy intermédiaire (type Nginx) de mettre en
+    // tampon la réponse avant de la relayer, ce qui ajouterait de la latence
+    'X-Accel-Buffering': 'no',
   });
 
   // Envoie tout de suite le tampon récent pour éviter un silence au début

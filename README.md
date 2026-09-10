@@ -90,7 +90,7 @@ Si tu n'es pas à l'aise avec les VPS et les lignes de commande, la solution la 
 2. Crée un compte sur **render.com**, connecte-toi avec GitHub en un clic.
 3. Clique "New +" → "Web Service", choisis ton repository `tantsaha-radio`.
 4. Render déploie automatiquement (`node server/server.js` est déjà indiqué dans `package.json`). Après 1-2 minutes, tu obtiens un lien du style `https://tantsaha-radio.onrender.com`.
-5. Sur **ton PC de diffusion**, dans `broadcast/diffuser-windows.bat` (ou `-mac-linux.sh`), remplace `SERVER_HOST=localhost` par `SERVER_HOST=tantsaha-radio.onrender.com` (sans le `https://`), et lance le script.
+5. Sur **ton PC de diffusion**, dans `broadcast/diffuser-windows.bat` (ou `-mac-linux.sh`), remplace `SERVER_URL=http://localhost:8000` par `SERVER_URL=https://tantsaha-radio.onrender.com` — attention, avec Render il faut `https://` (pas `http://`) et **pas de numéro de port** : Render n'expose que l'adresse web standard, jamais `:8000` directement. Lance ensuite le script.
 6. Partage le lien `https://tantsaha-radio.onrender.com` à tes auditeurs.
 
 ⚠️ **Deux limites à connaître sur le plan gratuit de Render** (vérifiées en septembre 2026) :
@@ -106,7 +106,7 @@ Cette étape ne remplace pas l'étape 3 : le script `diffuser-*` doit toujours t
 3. Ouvre le port **8000** dans le pare-feu du VPS.
 4. Sur **ton PC de diffusion**, dans le script de l'étape 3, remplace :
    ```
-   SERVER_HOST=IP_OU_DOMAINE_DE_TON_VPS
+   SERVER_URL=http://IP_OU_DOMAINE_DE_TON_VPS:8000
    ```
    → ton PC envoie alors son flux vers le VPS, même si toi tu restes chez toi.
 5. Tes auditeurs ouvrent simplement `http://IP_OU_DOMAINE_DE_TON_VPS:8000/` — c'est le serveur qui sert directement la page ET le flux, pas besoin d'hébergement séparé.
@@ -117,6 +117,13 @@ Cette étape ne remplace pas l'étape 3 : le script `diffuser-*` doit toujours t
 - **Plusieurs auditeurs en même temps** : le serveur gère déjà ça nativement (chaque auditeur = une connexion HTTP indépendante dans le `Set` `listeners`), pas de configuration supplémentaire nécessaire jusqu'à quelques centaines d'auditeurs simultanés.
 
 ---
+
+## Qualité audio et reconnexion automatique
+
+- **Qualité du flux** : 320 kbps / 48 kHz (qualité quasi-CD), réglé dans les scripts `broadcast/diffuser-*`. Pour changer, modifie `-b:a` (débit) et `-ar` (fréquence d'échantillonnage) dans ces fichiers. Un débit plus élevé consomme plus de données réseau, autant pour toi (émission) que pour tes auditeurs (réception) — 320 kbps convient bien pour du wifi/4G normal, mais pense-y si certains auditeurs ont une connexion très limitée.
+- **Reconnexion illimitée, des deux côtés** :
+  - Si le **serveur** coupe la diffusion (redémarrage, coupure réseau chez toi...), le script de diffusion retente automatiquement toutes les 3 secondes, indéfiniment, jusqu'à ce que tu fermes la fenêtre toi-même.
+  - Si le **lecteur d'un auditeur** perd la connexion, il retente lui aussi automatiquement (délai croissant jusqu'à 15 secondes entre les tentatives) et reprend la lecture tout seul dès que le direct revient — sans que l'auditeur ait besoin de ré-appuyer sur le bouton.
 
 ## Lecture en arrière-plan (mobile, onglet minimisé, écran verrouillé)
 
@@ -140,3 +147,4 @@ Rien à configurer : ces 3 fichiers s'en occupent — `public/manifest.json`, `p
 | `401 Mot de passe invalide` | `SOURCE_PASSWORD` ne correspond pas entre `server.js` et le script `diffuser-*` |
 | ffmpeg ne trouve pas le périphérique | Corrige `INPUT_DEVICE` avec le nom exact retourné par la commande de listing (étape 3) |
 | Léger silence puis coupure au tout début de la lecture | Normal une fraction de seconde le temps que le tampon "burst" se remplisse ; augmente `BURST_BUFFER_MAX_BYTES` dans `server.js` si besoin |
+| `Error number -10053` / `Conversion failed!` dans ffmpeg, avec une adresse du style `.../:8000/source` | `SERVER_URL` contient une erreur (port `:8000` en trop avec Render, ou `/` en trop à la fin). Avec Render : `https://ton-app.onrender.com` exactement, sans port, sans `/` final |

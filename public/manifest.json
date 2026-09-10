@@ -1,7 +1,7 @@
 {
-  "name": "Radio TV An'ny Tantsaha",
+  "name": "Radio An'ny Tantsaha",
   "short_name": "Tantsaha Radio",
-  "description": "Ny herin'ny tantsaha, ny ho avin'ny firenena — 107.8 MHz en direct",
+  "description": "Ny feon'ny tantsaha, ny herin'ny fampandrosoana — 107.8 MHz en direct",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#123321",
