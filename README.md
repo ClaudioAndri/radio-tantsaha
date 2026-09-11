@@ -118,6 +118,15 @@ Cette étape ne remplace pas l'étape 3 : le script `diffuser-*` doit toujours t
 
 ---
 
+## Lecture automatique et réglages sonores
+
+- **Lecture automatique à l'ouverture** : le lecteur essaie de démarrer le son dès que la page se charge. La plupart des navigateurs bloquent cependant le son tant que l'auditeur n'a pas interagi une première fois avec le site (règle universelle des navigateurs, pas une limite de notre lecteur) — dans ce cas, il retombe simplement sur "appuie sur le soleil", sans message d'erreur.
+- **Réglages sonores** (bouton "Réglages sonores" sous le lecteur) :
+  - **Volume** : de 0 à 150 % (au-delà de 100 %, c'est une amplification numérique — utile si la source est enregistrée trop bas, mais peut légèrement déformer le son si poussé trop fort).
+  - **Égaliseur 3 bandes** : Graves / Médiums / Aigus, réglables de -12 à +12 dB chacun.
+  - **Amélioration sonore (loudness)** : resserre la dynamique du son pour un rendu plus constant, comme sur les radios FM classiques (les passages faibles remontent, les pics sont contenus).
+  - Ces réglages sont personnels à chaque auditeur (stockés seulement dans son navigateur pour la session en cours) — ils n'affectent jamais le son reçu par les autres auditeurs ni le flux d'origine.
+
 ## Qualité audio et reconnexion automatique
 
 - **Qualité du flux** : 320 kbps / 48 kHz (qualité quasi-CD), réglé dans les scripts `broadcast/diffuser-*`. Pour changer, modifie `-b:a` (débit) et `-ar` (fréquence d'échantillonnage) dans ces fichiers. Un débit plus élevé consomme plus de données réseau, autant pour toi (émission) que pour tes auditeurs (réception) — 320 kbps convient bien pour du wifi/4G normal, mais pense-y si certains auditeurs ont une connexion très limitée.
