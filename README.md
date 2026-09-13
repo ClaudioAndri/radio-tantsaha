@@ -127,6 +127,32 @@ Cette étape ne remplace pas l'étape 3 : le script `diffuser-*` doit toujours t
   - **Amélioration sonore (loudness)** : resserre la dynamique du son pour un rendu plus constant, comme sur les radios FM classiques (les passages faibles remontent, les pics sont contenus).
   - Ces réglages sont personnels à chaque auditeur (stockés seulement dans son navigateur pour la session en cours) — ils n'affectent jamais le son reçu par les autres auditeurs ni le flux d'origine.
 
+## Zéro coupure perceptible : connexions qui se chevauchent
+
+Amélioration majeure : le serveur accepte maintenant une **relève sans coupure**. Concrètement :
+
+- Le script de diffusion lance une **nouvelle** connexion ffmpeg (en arrière-plan) toutes les 260 secondes, **avant** que la précédente (limitée à 300s) ne se termine — il y a donc 40 secondes où les deux tournent en même temps.
+- Le serveur bascule instantanément vers la nouvelle connexion dès qu'elle arrive, et laisse l'ancienne se terminer tranquillement en arrière-plan (ses données sont simplement ignorées).
+- **Les auditeurs ne sont jamais déconnectés pendant cette transition** — leur connexion HTTP reste ouverte en continu, alimentée sans interruption par l'une ou l'autre source. Testé et vérifié : un auditeur qui écoute pendant toute une transition reçoit un flux d'octets parfaitement continu, sans coupure.
+
+Comme plusieurs `ffmpeg` tournent volontairement en parallèle avec cette méthode, utilise **`broadcast/stop-diffusion.bat`** (Windows) pour tout arrêter proprement d'un coup — sur Mac/Linux, un simple `Ctrl+C` suffit (le script s'occupe de tuer tous les processus en arrière-plan).
+
+## Contourner la limite de connexion à ~6 minutes de Render
+
+Render coupe les connexions longues (comme celle de ffmpeg vers `/source`) après une durée fixe, quelle que soit l'activité — ce n'est pas une panne, c'est une limite de la plateforme (plan gratuit). On ne peut pas la supprimer, mais on peut la devancer :
+
+Les scripts `broadcast/diffuser-*` utilisent maintenant `-t 300` avec ffmpeg : chaque connexion se referme **elle-même, proprement, après 5 minutes** — donc toujours avant que Render ne la coupe de force vers 6 minutes. Résultat : au lieu d'une coupure brutale et imprévisible (avec parfois plusieurs secondes avant que ffmpeg détecte l'erreur), on a une reconnexion propre, rapide et prévisible toutes les 5 minutes — quasi imperceptible pour les auditeurs (le lecteur web se reconnecte lui aussi automatiquement en moins d'une seconde).
+
+⚠️ Ce n'est pas parfait : il y aura toujours un micro-blanc (le temps d'une reconnexion réseau, en général bien moins d'une seconde) toutes les 5 minutes. Pour l'éliminer complètement, il faudrait soit passer sur un serveur sans cette limite de durée (VPS classique, voir plus haut, ou plan payant Render), soit repenser l'architecture en flux segmenté façon HLS (bien plus complexe à mettre en place) — dis-le-moi si tu veux qu'on explore cette voie plus tard.
+
+## Empêcher la mise en veille de Render (auto-ping)
+
+Le serveur s'auto-ping maintenant tout seul toutes les 10 minutes quand il tourne sur Render (rien à configurer — ça s'active automatiquement grâce à une variable que Render fournit, et ça ne fait rien en local). Ça évite le "spin down" du plan gratuit après 15 minutes sans visiteur, et donc le délai de 30-60 secondes que subirait un auditeur en rouvrant le lien après un moment sans activité.
+
+⚠️ **Important : ceci ne concerne que la mise en veille par inactivité.** Ça ne règle pas d'éventuelles coupures qui surviennent *pendant* une diffusion déjà active (comme celle observée après ~6 minutes de test) — ces coupures-là viennent d'une limite de durée sur les connexions longues, pas d'inactivité, et sont gérées séparément par la reconnexion automatique du script `diffuser-*` (voir plus haut).
+
+Pour une garantie encore plus solide (redondance, au cas où l'auto-ping interne manquerait un cycle après un redéploiement par exemple), tu peux en complément inscrire ton lien sur un service de ping externe et gratuit comme **UptimeRobot** (uptimerobot.com) ou **cron-job.org** : crée un moniteur HTTP pointant vers `https://ton-app.onrender.com/ping`, intervalle 5 minutes. Aucune carte bancaire, 2 minutes de configuration.
+
 ## Qualité audio et reconnexion automatique
 
 - **Qualité du flux** : 320 kbps / 48 kHz (qualité quasi-CD), réglé dans les scripts `broadcast/diffuser-*`. Pour changer, modifie `-b:a` (débit) et `-ar` (fréquence d'échantillonnage) dans ces fichiers. Un débit plus élevé consomme plus de données réseau, autant pour toi (émission) que pour tes auditeurs (réception) — 320 kbps convient bien pour du wifi/4G normal, mais pense-y si certains auditeurs ont une connexion très limitée.

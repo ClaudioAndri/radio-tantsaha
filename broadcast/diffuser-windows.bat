@@ -1,7 +1,9 @@
 @echo off
 REM ============================================================
 REM  RADIO TV AN'NY TANTSAHA — Script de diffusion (Windows)
-REM  Envoie le son (via cable audio virtuel) vers NOTRE serveur.
+REM  Envoie le son (via cable audio virtuel) vers NOTRE serveur,
+REM  avec des connexions qui SE CHEVAUCHENT : une nouvelle demarre
+REM  avant que l'ancienne ne se termine, donc plus AUCUN vide.
 REM ============================================================
 
 REM --- 1. A ADAPTER ---
@@ -27,19 +29,23 @@ echo ============================================
 echo   RADIO TV AN'NY TANTSAHA - EN DIRECT
 echo   Entree audio : %INPUT_DEVICE%
 echo   Vers         : %SERVER_URL%/source
-echo   (Reconnexion automatique en cas de coupure)
-echo   (Ctrl+C pour arreter definitivement)
+echo   Connexions chevauchantes : AUCUN vide audio
+echo   (Pour tout arreter : lance stop-diffusion.bat)
 echo ============================================
 
 :loop
-ffmpeg -f dshow -i audio="%INPUT_DEVICE%" ^
+REM Chaque connexion dure 300s (-t 300) et une NOUVELLE est lancee
+REM en arriere-plan (start /B) 260s apres la precedente, donc 40s
+REM AVANT qu'elle ne se termine : les deux tournent en meme temps
+REM pendant ce chevauchement, le serveur bascule vers la nouvelle
+REM des qu'elle arrive, et l'auditeur ne voit jamais de coupure.
+start "" /B ffmpeg -f dshow -i audio="%INPUT_DEVICE%" ^
   -acodec libmp3lame -b:a 320k -ar 48000 -ac 2 ^
   -write_xing 0 -id3v2_version 0 -flush_packets 1 ^
+  -t 300 ^
   -content_type audio/mpeg ^
   -f mp3 -method PUT "%SERVER_URL%/source?key=%SOURCE_PASSWORD%"
 
-echo.
-echo [!] Connexion interrompue - nouvelle tentative dans 3 secondes...
-echo     (Ferme cette fenetre pour arreter definitivement la diffusion)
-timeout /t 3 /nobreak >nul
+echo [i] %date% %time% - Nouvelle connexion lancee en arriere-plan
+timeout /t 260 /nobreak >nul
 goto loop

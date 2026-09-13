@@ -15,6 +15,7 @@
  */
 
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
@@ -45,6 +46,14 @@ function log(...args) {
 }
 
 // ---------------------- Gestion de la source (le diffuseur) ----------------------
+// Supporte la "relève sans coupure" : si une nouvelle connexion source arrive
+// pendant qu'une autre diffuse déjà, on ne la rejette plus (409) — on la
+// laisse prendre le relais immédiatement, pendant que l'ancienne termine
+// tranquillement en arrière-plan. Comme les auditeurs ne sont JAMAIS
+// déconnectés pendant ce chevauchement (le flux continue sans interruption
+// entre les deux sources), il n'y a plus aucune coupure perceptible tant
+// que le script de diffusion démarre la nouvelle connexion un peu avant
+// que l'ancienne n'atteigne sa limite de durée (-t) côté ffmpeg.
 function handleSource(req, res, query) {
   if (query.get('key') !== SOURCE_PASSWORD) {
     res.writeHead(401, { 'Content-Type': 'text/plain' });
@@ -53,41 +62,40 @@ function handleSource(req, res, query) {
     return;
   }
 
-  if (sourceReq) {
-    res.writeHead(409, { 'Content-Type': 'text/plain' });
-    res.end('Une diffusion est déjà en cours sur ce serveur.');
-    log('Connexion source refusée : déjà en direct');
-    return;
-  }
+  const takingOver = !!sourceReq;
+  const state = { retired: false };
 
-  sourceReq = req;
+  sourceReq = req; // cette connexion devient la source active
   isLive = true;
-  liveSince = Date.now();
-  recentChunks = [];
-  recentBytes = 0;
+  if (!liveSince) liveSince = Date.now();
+  if (!takingOver) {
+    recentChunks = [];
+    recentBytes = 0;
+  }
   if (req.socket) req.socket.setNoDelay(true);
-  log('🔴 Diffusion DÉMARRÉE — flux audio en direct');
+  log(takingOver
+    ? '🔁 Relève sans coupure — une nouvelle connexion prend le relais'
+    : '🔴 Diffusion DÉMARRÉE — flux audio en direct');
 
-  // Le serveur garde cette requête ouverte tant que ffmpeg envoie des données.
   req.on('data', (chunk) => {
-    // Alimente le tampon de démarrage (ring buffer)
+    if (state.retired) return; // cette source a été relevée : on ignore ses données
     recentChunks.push(chunk);
     recentBytes += chunk.length;
     while (recentBytes > BURST_BUFFER_MAX_BYTES && recentChunks.length > 1) {
       recentBytes -= recentChunks[0].length;
       recentChunks.shift();
     }
-    // Redistribue immédiatement le morceau à chaque auditeur connecté
     for (const listenerRes of listeners) {
-      // si un auditeur est trop lent (backpressure), on ne bloque pas les autres
-      if (!listenerRes.write(chunk)) {
-        // écriture mise en file, Node gérera tout seul le drain
-      }
+      listenerRes.write(chunk);
     }
   });
 
-  const endSource = () => {
+  const endThisSource = () => {
+    if (state.retired) return; // déjà traité (Node peut émettre 'end' ET 'close')
+    state.retired = true;
     if (sourceReq === req) {
+      // C'était la source active (pas une ancienne connexion relevée) :
+      // plus personne ne diffuse, on coupe proprement les auditeurs.
       sourceReq = null;
       isLive = false;
       liveSince = null;
@@ -95,24 +103,21 @@ function handleSource(req, res, query) {
       recentBytes = 0;
       currentTitle = '';
       log('⏹️  Diffusion ARRÊTÉE');
-      // Ferme proprement chaque auditeur connecté : ça déclenche tout de
-      // suite l'événement de fin côté navigateur, qui relance alors sa
-      // reconnexion automatique au lieu d'attendre un blocage silencieux.
       for (const listenerRes of listeners) {
         try { listenerRes.end(); } catch (e) { /* déjà fermé */ }
       }
       listeners.clear();
+    } else {
+      log('🔚 Ancienne connexion (relevée) refermée proprement — diffusion toujours en cours');
     }
-    // Ferme proprement la réponse HTTP vers ffmpeg/curl, sinon la connexion
-    // reste ouverte indéfiniment en attente d'une fin de réponse.
     if (!res.writableEnded) {
       try { res.end('OK'); } catch (e) { /* déjà fermé */ }
     }
   };
-  req.on('end', endSource);
-  req.on('close', endSource);
-  req.on('error', endSource);
-  res.on('error', endSource);
+  req.on('end', endThisSource);
+  req.on('close', endThisSource);
+  req.on('error', endThisSource);
+  res.on('error', endThisSource);
 
   // L'entête part tout de suite ; le corps de la réponse ne sera
   // envoyé (res.end) que lorsque la source se termine (voir endSource).
@@ -222,6 +227,12 @@ const server = http.createServer((req, res) => {
     return handleListener(req, res);
   }
 
+  if (req.method === 'GET' && url.pathname === '/ping') {
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+    res.end('pong');
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/status') {
     return handleStatus(res);
   }
@@ -233,6 +244,36 @@ const server = http.createServer((req, res) => {
   res.writeHead(405, { 'Content-Type': 'text/plain' });
   res.end('Méthode non autorisée');
 });
+
+// ---------------------------------------------------------------
+// Auto-ping anti-veille : Render (plan gratuit) met le service en
+// pause après 15 min sans requête entrante. On s'auto-appelle toutes
+// les 10 minutes (donc toujours avant les 15 min fatidiques) pour
+// que ça n'arrive jamais. Ne fait rien en local : RENDER_EXTERNAL_URL
+// n'existe que sur Render, fourni automatiquement par la plateforme.
+// ⚠️ Ceci évite la mise en veille par inactivité — ce n'est PAS lié
+// aux coupures qui peuvent survenir PENDANT une diffusion active
+// (celles-ci sont gérées par la reconnexion automatique du script
+// de diffusion, voir broadcast/diffuser-*).
+// ---------------------------------------------------------------
+const PING_INTERVAL_MS = 10 * 60 * 1000;
+
+function selfPing() {
+  const externalUrl = process.env.RENDER_EXTERNAL_URL;
+  if (!externalUrl) return;
+  const target = externalUrl.replace(/\/+$/, '') + '/ping';
+  https.get(target, (res) => {
+    log(`🔄 Ping anti-veille envoyé (code ${res.statusCode})`);
+    res.resume();
+  }).on('error', (err) => {
+    log('⚠️  Échec du ping anti-veille :', err.message);
+  });
+}
+
+if (process.env.RENDER_EXTERNAL_URL) {
+  setInterval(selfPing, PING_INTERVAL_MS);
+  log(`🔄 Auto-ping activé (toutes les ${PING_INTERVAL_MS / 60000} min) pour éviter la mise en veille Render`);
+}
 
 server.listen(PORT, () => {
   log(`✅ Serveur "${STATION_NAME}" prêt`);
