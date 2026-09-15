@@ -35,6 +35,7 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 // ---------------------- État en mémoire ----------------------
 let listeners = new Set();      // réponses HTTP des auditeurs connectés
 let sourceReq = null;           // requête HTTP du diffuseur (ffmpeg) actif
+let retireActiveSource = null;  // fonction qui désactive la diffusion de la source active
 let isLive = false;
 let liveSince = null;
 let recentChunks = [];          // tampon "burst" pour les nouveaux auditeurs
@@ -65,7 +66,17 @@ function handleSource(req, res, query) {
   const takingOver = !!sourceReq;
   const state = { retired: false };
 
+  if (takingOver && retireActiveSource) {
+    // Désactive IMMÉDIATEMENT la diffusion de l'ancienne source : elle
+    // continue de recevoir des données (on la laisse se terminer
+    // tranquillement) mais elles ne sont plus jamais rediffusées.
+    // Sans cette ligne, les deux sources étaient envoyées en même temps
+    // pendant tout le chevauchement, d'où le son superposé.
+    retireActiveSource();
+  }
+
   sourceReq = req; // cette connexion devient la source active
+  retireActiveSource = () => { state.retired = true; };
   isLive = true;
   if (!liveSince) liveSince = Date.now();
   if (!takingOver) {
@@ -97,6 +108,7 @@ function handleSource(req, res, query) {
       // C'était la source active (pas une ancienne connexion relevée) :
       // plus personne ne diffuse, on coupe proprement les auditeurs.
       sourceReq = null;
+      retireActiveSource = null;
       isLive = false;
       liveSince = null;
       recentChunks = [];
