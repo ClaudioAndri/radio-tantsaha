@@ -150,6 +150,32 @@
 
   .eq-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
   .eq-grid .settings-row-head{justify-content:center;gap:4px;flex-direction:column;align-items:center;text-align:center;}
+  .eq-band{display:flex;flex-direction:column;gap:10px;}
+  .eq-band-label{
+    text-align:center;font-size:11px;font-weight:600;color:var(--cream);
+    text-transform:uppercase;letter-spacing:0.04em;
+  }
+  .eq-band-sub{font-size:10px;color:var(--cream-dim);text-align:center;margin-top:-6px;}
+
+  .settings-section-title{
+    font-size:11px;text-transform:uppercase;letter-spacing:0.06em;
+    color:var(--gold-soft);font-weight:600;margin:0 0 10px;
+    padding-top:14px;border-top:1px solid rgba(251,246,233,0.12);
+  }
+  .settings-row:first-child .settings-section-title,
+  .settings-panel > .settings-section-title:first-child{border-top:none;padding-top:0;}
+
+  .preset-btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;padding:10px 14px;margin-bottom:4px;
+    border-radius:12px;border:1px solid rgba(240,180,41,0.4);
+    background:rgba(240,180,41,0.1);color:var(--gold-soft);
+    font-family:'Inter',sans-serif;font-size:13px;font-weight:600;
+    cursor:pointer;transition:background 0.15s ease;
+  }
+  .preset-btn:hover{background:rgba(240,180,41,0.18);}
+  .preset-btn svg{width:16px;height:16px;fill:var(--gold-soft);}
+  .preset-note{font-size:11px;color:var(--cream-dim);text-align:center;margin:0 0 4px;}
 
   .loudness-row{
     display:flex;align-items:center;justify-content:space-between;
@@ -238,35 +264,79 @@
   </button>
 
   <div class="settings-panel" id="settingsPanel">
+    <button class="preset-btn" id="presetOptimized" type="button">
+      <svg viewBox="0 0 24 24"><path d="M12 2 14.5 9 22 9.5 16.5 14 18.5 21.5 12 17.5 5.5 21.5 7.5 14 2 9.5 9.5 9Z"/></svg>
+      Appliquer un son optimisé
+    </button>
+    <p class="preset-note">Réglage en un clic (filtres, égaliseur, loudness, largeur stéréo) — tu peux ensuite tout ajuster à la main</p>
+
     <div class="settings-row">
       <div class="settings-row-head"><b>Volume</b><span id="volumeValue">100%</span></div>
       <input type="range" id="volumeSlider" min="0" max="150" value="100" step="1">
     </div>
 
+    <p class="settings-section-title">Filtres de protection</p>
+    <div class="settings-row">
+      <div class="settings-row-head"><b>Coupe-bas (anti-grondement)</b><span id="highpassValue">30 Hz</span></div>
+      <input type="range" id="highpassSlider" min="20" max="200" value="30" step="1">
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-head"><b>Coupe-haut (anti-stridence)</b><span id="lowpassValue">18000 Hz</span></div>
+      <input type="range" id="lowpassSlider" min="4000" max="20000" value="18000" step="100">
+    </div>
+
+    <p class="settings-section-title">Égaliseur paramétrique</p>
     <div class="settings-row eq-grid">
-      <div>
-        <div class="settings-row-head"><b>Graves</b><span id="bassValue">0</span></div>
-        <input type="range" id="bassSlider" min="-12" max="12" value="0" step="1">
+      <div class="eq-band">
+        <div class="eq-band-label">Graves</div>
+        <div>
+          <div class="settings-row-head"><span>Fréq.</span><span id="bassFreqValue">150 Hz</span></div>
+          <input type="range" id="bassFreqSlider" min="60" max="400" value="150" step="5">
+        </div>
+        <div>
+          <div class="settings-row-head"><span>Gain</span><span id="bassValue">0 dB</span></div>
+          <input type="range" id="bassSlider" min="-12" max="12" value="0" step="1">
+        </div>
       </div>
-      <div>
-        <div class="settings-row-head"><b>Médiums</b><span id="midValue">0</span></div>
-        <input type="range" id="midSlider" min="-12" max="12" value="0" step="1">
+      <div class="eq-band">
+        <div class="eq-band-label">Médiums</div>
+        <div>
+          <div class="settings-row-head"><span>Fréq.</span><span id="midFreqValue">1000 Hz</span></div>
+          <input type="range" id="midFreqSlider" min="300" max="5000" value="1000" step="50">
+        </div>
+        <div>
+          <div class="settings-row-head"><span>Gain</span><span id="midValue">0 dB</span></div>
+          <input type="range" id="midSlider" min="-12" max="12" value="0" step="1">
+        </div>
       </div>
-      <div>
-        <div class="settings-row-head"><b>Aigus</b><span id="trebleValue">0</span></div>
-        <input type="range" id="trebleSlider" min="-12" max="12" value="0" step="1">
+      <div class="eq-band">
+        <div class="eq-band-label">Aigus</div>
+        <div>
+          <div class="settings-row-head"><span>Fréq.</span><span id="trebleFreqValue">6000 Hz</span></div>
+          <input type="range" id="trebleFreqSlider" min="2000" max="16000" value="6000" step="100">
+        </div>
+        <div>
+          <div class="settings-row-head"><span>Gain</span><span id="trebleValue">0 dB</span></div>
+          <input type="range" id="trebleSlider" min="-12" max="12" value="0" step="1">
+        </div>
       </div>
     </div>
 
+    <p class="settings-section-title">Espace sonore</p>
+    <div class="settings-row">
+      <div class="settings-row-head"><b>Largeur stéréo</b><span id="stereoWidthValue">100%</span></div>
+      <input type="range" id="stereoWidthSlider" min="0" max="200" value="100" step="5">
+    </div>
+
     <div class="loudness-row">
-      <p><b>Amélioration sonore</b><br>Uniformise le volume (loudness) pour un son plus constant</p>
+      <p><b>Loudness broadcast</b><br>Compresse la dynamique pour un son plus riche et constant, comme à la radio FM</p>
       <label class="switch">
         <input type="checkbox" id="loudnessToggle">
         <span class="switch-track"></span>
       </label>
     </div>
 
-    <button class="reset-link" id="resetSettings" type="button">Réinitialiser les réglages</button>
+    <button class="reset-link" id="resetSettings" type="button">Réinitialiser tous les réglages</button>
   </div>
 </main>
 
@@ -423,13 +493,17 @@
   setupMediaSession();
 
   // ---------------------------------------------------------------
-  // Réglages sonores : volume, égaliseur 3 bandes, amélioration du
-  // son (loudness). Basé sur la Web Audio API — créé une seule fois,
-  // au premier vrai geste de l'utilisateur (obligatoire pour que le
-  // navigateur autorise le son).
+  // Réglages sonores avancés — basé sur la Web Audio API, créé une
+  // seule fois au premier vrai geste de l'utilisateur (obligatoire
+  // pour que le navigateur autorise le son) :
+  //   source -> coupe-bas -> coupe-haut -> égaliseur paramétrique
+  //   (3 bandes réglables en fréquence ET en gain) -> compresseur
+  //   loudness -> élargisseur stéréo (matrice mid/side) -> volume
   // ---------------------------------------------------------------
   let audioCtx = null;
-  let gainNode = null, bassFilter = null, midFilter = null, trebleFilter = null, compressor = null;
+  let gainNode = null, highpassFilter = null, lowpassFilter = null;
+  let bassFilter = null, midFilter = null, trebleFilter = null, compressor = null;
+  let widthGain = null, invWidthGain = null;
   let audioGraphReady = false;
 
   function ensureAudioGraph() {
@@ -443,36 +517,76 @@
       audioCtx = new AudioContextClass();
       const sourceNode = audioCtx.createMediaElementSource(audio);
 
+      highpassFilter = audioCtx.createBiquadFilter();
+      highpassFilter.type = 'highpass';
+      highpassFilter.frequency.value = Number(highpassSlider.value);
+      highpassFilter.Q.value = 0.7;
+
+      lowpassFilter = audioCtx.createBiquadFilter();
+      lowpassFilter.type = 'lowpass';
+      lowpassFilter.frequency.value = Number(lowpassSlider.value);
+      lowpassFilter.Q.value = 0.7;
+
       bassFilter = audioCtx.createBiquadFilter();
       bassFilter.type = 'lowshelf';
-      bassFilter.frequency.value = 200;
+      bassFilter.frequency.value = Number(bassFreqSlider.value);
+      bassFilter.gain.value = Number(bassSlider.value);
 
       midFilter = audioCtx.createBiquadFilter();
       midFilter.type = 'peaking';
-      midFilter.frequency.value = 1000;
-      midFilter.Q.value = 0.9;
+      midFilter.frequency.value = Number(midFreqSlider.value);
+      midFilter.Q.value = 1.1;
+      midFilter.gain.value = Number(midSlider.value);
 
       trebleFilter = audioCtx.createBiquadFilter();
       trebleFilter.type = 'highshelf';
-      trebleFilter.frequency.value = 3000;
+      trebleFilter.frequency.value = Number(trebleFreqSlider.value);
+      trebleFilter.gain.value = Number(trebleSlider.value);
 
       compressor = audioCtx.createDynamicsCompressor();
       applyLoudness(loudnessToggle.checked);
 
+      // --- Élargisseur stéréo (matrice mid/side) ---
+      // mid = (L+R)/2, side = (L-R)/2, puis on ré-injecte le side
+      // amplifié par la largeur voulue : Lout = mid + side*w,
+      // Rout = mid - side*w. w=1 -> son inchangé, w>1 -> plus large.
+      const splitter = audioCtx.createChannelSplitter(2);
+      const merger = audioCtx.createChannelMerger(2);
+      const midSum = audioCtx.createGain();
+      midSum.gain.value = 0.5;
+      const invertR = audioCtx.createGain();
+      invertR.gain.value = -1;
+      const sideSum = audioCtx.createGain();
+      sideSum.gain.value = 0.5;
+      widthGain = audioCtx.createGain();
+      widthGain.gain.value = Number(stereoWidthSlider.value) / 100;
+      invWidthGain = audioCtx.createGain();
+      invWidthGain.gain.value = -1;
+
+      splitter.connect(midSum, 0);
+      splitter.connect(midSum, 1);
+      splitter.connect(sideSum, 0);
+      splitter.connect(invertR, 1);
+      invertR.connect(sideSum);
+      sideSum.connect(widthGain);
+      widthGain.connect(invWidthGain);
+      midSum.connect(merger, 0, 0);
+      midSum.connect(merger, 0, 1);
+      widthGain.connect(merger, 0, 0);
+      invWidthGain.connect(merger, 0, 1);
+
       gainNode = audioCtx.createGain();
       gainNode.gain.value = Number(volumeSlider.value) / 100;
 
-      sourceNode.connect(bassFilter);
+      sourceNode.connect(highpassFilter);
+      highpassFilter.connect(lowpassFilter);
+      lowpassFilter.connect(bassFilter);
       bassFilter.connect(midFilter);
       midFilter.connect(trebleFilter);
       trebleFilter.connect(compressor);
-      compressor.connect(gainNode);
+      compressor.connect(splitter);
+      merger.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-
-      // applique les réglages déjà en place sur les curseurs
-      bassFilter.gain.value = Number(bassSlider.value);
-      midFilter.gain.value = Number(midSlider.value);
-      trebleFilter.gain.value = Number(trebleSlider.value);
 
       audioGraphReady = true;
     } catch (e) {
@@ -485,7 +599,8 @@
     if (!compressor) return;
     if (enabled) {
       // resserre la dynamique : les passages faibles remontent, les
-      // pics sont contenus - un son plus constant, comme à la radio FM
+      // pics sont contenus - un son plus riche et constant, comme à
+      // la radio FM (limiteur/compresseur de diffusion classique)
       compressor.threshold.setValueAtTime(-28, audioCtx.currentTime);
       compressor.knee.setValueAtTime(12, audioCtx.currentTime);
       compressor.ratio.setValueAtTime(6, audioCtx.currentTime);
@@ -504,49 +619,105 @@
   const settingsPanel = document.getElementById('settingsPanel');
   const volumeSlider = document.getElementById('volumeSlider');
   const volumeValue = document.getElementById('volumeValue');
+  const highpassSlider = document.getElementById('highpassSlider');
+  const highpassValue = document.getElementById('highpassValue');
+  const lowpassSlider = document.getElementById('lowpassSlider');
+  const lowpassValue = document.getElementById('lowpassValue');
+  const bassFreqSlider = document.getElementById('bassFreqSlider');
+  const bassFreqValue = document.getElementById('bassFreqValue');
   const bassSlider = document.getElementById('bassSlider');
   const bassValue = document.getElementById('bassValue');
+  const midFreqSlider = document.getElementById('midFreqSlider');
+  const midFreqValue = document.getElementById('midFreqValue');
   const midSlider = document.getElementById('midSlider');
   const midValue = document.getElementById('midValue');
+  const trebleFreqSlider = document.getElementById('trebleFreqSlider');
+  const trebleFreqValue = document.getElementById('trebleFreqValue');
   const trebleSlider = document.getElementById('trebleSlider');
   const trebleValue = document.getElementById('trebleValue');
+  const stereoWidthSlider = document.getElementById('stereoWidthSlider');
+  const stereoWidthValue = document.getElementById('stereoWidthValue');
   const loudnessToggle = document.getElementById('loudnessToggle');
   const resetSettings = document.getElementById('resetSettings');
+  const presetOptimized = document.getElementById('presetOptimized');
 
   settingsToggle.addEventListener('click', () => {
     ensureAudioGraph();
     settingsPanel.classList.toggle('open');
   });
 
-  function formatDb(v) { return (v > 0 ? '+' : '') + v; }
+  function formatDb(v) { return (v > 0 ? '+' : '') + v + ' dB'; }
+  const now = () => audioCtx.currentTime;
 
   volumeSlider.addEventListener('input', () => {
     ensureAudioGraph();
     const v = Number(volumeSlider.value);
     volumeValue.textContent = v + '%';
-    if (gainNode) gainNode.gain.setValueAtTime(v / 100, audioCtx.currentTime);
+    if (gainNode) gainNode.gain.setValueAtTime(v / 100, now());
     else audio.volume = Math.min(1, v / 100); // repli si Web Audio indisponible
   });
 
+  highpassSlider.addEventListener('input', () => {
+    ensureAudioGraph();
+    const v = Number(highpassSlider.value);
+    highpassValue.textContent = v + ' Hz';
+    if (highpassFilter) highpassFilter.frequency.setValueAtTime(v, now());
+  });
+
+  lowpassSlider.addEventListener('input', () => {
+    ensureAudioGraph();
+    const v = Number(lowpassSlider.value);
+    lowpassValue.textContent = v + ' Hz';
+    if (lowpassFilter) lowpassFilter.frequency.setValueAtTime(v, now());
+  });
+
+  bassFreqSlider.addEventListener('input', () => {
+    ensureAudioGraph();
+    const v = Number(bassFreqSlider.value);
+    bassFreqValue.textContent = v + ' Hz';
+    if (bassFilter) bassFilter.frequency.setValueAtTime(v, now());
+  });
   bassSlider.addEventListener('input', () => {
     ensureAudioGraph();
     const v = Number(bassSlider.value);
     bassValue.textContent = formatDb(v);
-    if (bassFilter) bassFilter.gain.setValueAtTime(v, audioCtx.currentTime);
+    if (bassFilter) bassFilter.gain.setValueAtTime(v, now());
   });
 
+  midFreqSlider.addEventListener('input', () => {
+    ensureAudioGraph();
+    const v = Number(midFreqSlider.value);
+    midFreqValue.textContent = v + ' Hz';
+    if (midFilter) midFilter.frequency.setValueAtTime(v, now());
+  });
   midSlider.addEventListener('input', () => {
     ensureAudioGraph();
     const v = Number(midSlider.value);
     midValue.textContent = formatDb(v);
-    if (midFilter) midFilter.gain.setValueAtTime(v, audioCtx.currentTime);
+    if (midFilter) midFilter.gain.setValueAtTime(v, now());
   });
 
+  trebleFreqSlider.addEventListener('input', () => {
+    ensureAudioGraph();
+    const v = Number(trebleFreqSlider.value);
+    trebleFreqValue.textContent = v + ' Hz';
+    if (trebleFilter) trebleFilter.frequency.setValueAtTime(v, now());
+  });
   trebleSlider.addEventListener('input', () => {
     ensureAudioGraph();
     const v = Number(trebleSlider.value);
     trebleValue.textContent = formatDb(v);
-    if (trebleFilter) trebleFilter.gain.setValueAtTime(v, audioCtx.currentTime);
+    if (trebleFilter) trebleFilter.gain.setValueAtTime(v, now());
+  });
+
+  stereoWidthSlider.addEventListener('input', () => {
+    ensureAudioGraph();
+    const v = Number(stereoWidthSlider.value);
+    stereoWidthValue.textContent = v + '%';
+    if (widthGain) {
+      widthGain.gain.setValueAtTime(v / 100, now());
+      invWidthGain.gain.setValueAtTime(-(v / 100), now());
+    }
   });
 
   loudnessToggle.addEventListener('change', () => {
@@ -554,18 +725,35 @@
     applyLoudness(loudnessToggle.checked);
   });
 
+  // "Son optimisé" : un preset en un clic (léger creux anti-grondement,
+  // légère brillance dans l'aigu, loudness activé, stéréo élargie) —
+  // les réglages restent modifiables à la main juste après.
+  presetOptimized.addEventListener('click', () => {
+    ensureAudioGraph();
+    highpassSlider.value = 50; highpassSlider.dispatchEvent(new Event('input'));
+    lowpassSlider.value = 15000; lowpassSlider.dispatchEvent(new Event('input'));
+    bassFreqSlider.value = 120; bassFreqSlider.dispatchEvent(new Event('input'));
+    bassSlider.value = 2; bassSlider.dispatchEvent(new Event('input'));
+    midFreqSlider.value = 600; midFreqSlider.dispatchEvent(new Event('input'));
+    midSlider.value = -1; midSlider.dispatchEvent(new Event('input'));
+    trebleFreqSlider.value = 8000; trebleFreqSlider.dispatchEvent(new Event('input'));
+    trebleSlider.value = 3; trebleSlider.dispatchEvent(new Event('input'));
+    stereoWidthSlider.value = 130; stereoWidthSlider.dispatchEvent(new Event('input'));
+    loudnessToggle.checked = true; loudnessToggle.dispatchEvent(new Event('change'));
+  });
+
   resetSettings.addEventListener('click', () => {
-    volumeSlider.value = 100; volumeValue.textContent = '100%';
-    bassSlider.value = 0; bassValue.textContent = '0';
-    midSlider.value = 0; midValue.textContent = '0';
-    trebleSlider.value = 0; trebleValue.textContent = '0';
-    loudnessToggle.checked = false;
-    if (gainNode) gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-    else audio.volume = 1;
-    if (bassFilter) bassFilter.gain.setValueAtTime(0, audioCtx.currentTime);
-    if (midFilter) midFilter.gain.setValueAtTime(0, audioCtx.currentTime);
-    if (trebleFilter) trebleFilter.gain.setValueAtTime(0, audioCtx.currentTime);
-    applyLoudness(false);
+    volumeSlider.value = 100; volumeSlider.dispatchEvent(new Event('input'));
+    highpassSlider.value = 30; highpassSlider.dispatchEvent(new Event('input'));
+    lowpassSlider.value = 18000; lowpassSlider.dispatchEvent(new Event('input'));
+    bassFreqSlider.value = 150; bassFreqSlider.dispatchEvent(new Event('input'));
+    bassSlider.value = 0; bassSlider.dispatchEvent(new Event('input'));
+    midFreqSlider.value = 1000; midFreqSlider.dispatchEvent(new Event('input'));
+    midSlider.value = 0; midSlider.dispatchEvent(new Event('input'));
+    trebleFreqSlider.value = 6000; trebleFreqSlider.dispatchEvent(new Event('input'));
+    trebleSlider.value = 0; trebleSlider.dispatchEvent(new Event('input'));
+    stereoWidthSlider.value = 100; stereoWidthSlider.dispatchEvent(new Event('input'));
+    loudnessToggle.checked = false; loudnessToggle.dispatchEvent(new Event('change'));
   });
 
   // ---------------------------------------------------------------

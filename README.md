@@ -121,29 +121,25 @@ Cette étape ne remplace pas l'étape 3 : le script `diffuser-*` doit toujours t
 ## Lecture automatique et réglages sonores
 
 - **Lecture automatique à l'ouverture** : le lecteur essaie de démarrer le son dès que la page se charge. La plupart des navigateurs bloquent cependant le son tant que l'auditeur n'a pas interagi une première fois avec le site (règle universelle des navigateurs, pas une limite de notre lecteur) — dans ce cas, il retombe simplement sur "appuie sur le soleil", sans message d'erreur.
-- **Réglages sonores** (bouton "Réglages sonores" sous le lecteur) :
+- **Réglages sonores** (bouton "Réglages sonores" sous le lecteur), personnels à chaque auditeur (stockés seulement dans son navigateur, n'affectent jamais les autres ni le flux d'origine) :
+  - **Appliquer un son optimisé** : un bouton qui règle tout en un clic (filtres, égaliseur, loudness, largeur stéréo) vers des valeurs équilibrées — modifiable à la main juste après.
   - **Volume** : de 0 à 150 % (au-delà de 100 %, c'est une amplification numérique — utile si la source est enregistrée trop bas, mais peut légèrement déformer le son si poussé trop fort).
-  - **Égaliseur 3 bandes** : Graves / Médiums / Aigus, réglables de -12 à +12 dB chacun.
-  - **Amélioration sonore (loudness)** : resserre la dynamique du son pour un rendu plus constant, comme sur les radios FM classiques (les passages faibles remontent, les pics sont contenus).
-  - Ces réglages sont personnels à chaque auditeur (stockés seulement dans son navigateur pour la session en cours) — ils n'affectent jamais le son reçu par les autres auditeurs ni le flux d'origine.
+  - **Filtres de protection** : coupe-bas (retire le grondement sourd en dessous de la fréquence choisie) et coupe-haut (adoucit la stridence au-dessus de la fréquence choisie) — les deux sont réglables, désactivés par défaut (valeurs quasi transparentes).
+  - **Égaliseur paramétrique 3 bandes** (Graves / Médiums / Aigus) : contrairement à un égaliseur classique à fréquences fixes, ici la fréquence ET le gain de chaque bande sont réglables indépendamment (ex : décider que "les graves" commencent à 100 Hz plutôt qu'à 200 Hz).
+  - **Largeur stéréo** : élargit ou resserre l'image stéréo (0% = mono, 100% = normal, jusqu'à 200% = son plus large et enveloppant), via une vraie matrice mid/side construite avec l'API audio du navigateur — l'objectif est un rendu plus riche et immersif, sans utiliser de technologie propriétaire sous licence (Dolby et équivalents restent des marques déposées, non intégrées ici).
+  - **Loudness broadcast** : compresseur qui resserre la dynamique pour un son plus constant, comme sur les radios FM classiques (les passages faibles remontent, les pics sont contenus).
 
 ## Zéro coupure perceptible : connexions qui se chevauchent
 
-Amélioration majeure : le serveur accepte maintenant une **relève sans coupure**. Concrètement :
+Le serveur accepte une **relève sans coupure**. Concrètement :
 
 - Le script de diffusion lance une **nouvelle** connexion ffmpeg (en arrière-plan) toutes les 260 secondes, **avant** que la précédente (limitée à 300s) ne se termine — il y a donc 40 secondes où les deux tournent en même temps.
-- Le serveur bascule instantanément vers la nouvelle connexion dès qu'elle arrive, et laisse l'ancienne se terminer tranquillement en arrière-plan (ses données sont simplement ignorées).
-- **Les auditeurs ne sont jamais déconnectés pendant cette transition** — leur connexion HTTP reste ouverte en continu, alimentée sans interruption par l'une ou l'autre source. Testé et vérifié : un auditeur qui écoute pendant toute une transition reçoit un flux d'octets parfaitement continu, sans coupure.
+- Le serveur bascule instantanément vers la nouvelle connexion dès qu'elle arrive, et laisse l'ancienne se terminer tranquillement en arrière-plan (ses données sont simplement ignorées, pas rediffusées — donc pas de son superposé).
+- **Les auditeurs ne sont jamais déconnectés pendant cette transition** — leur connexion HTTP reste ouverte en continu, alimentée sans interruption par l'une ou l'autre source.
 
 Comme plusieurs `ffmpeg` tournent volontairement en parallèle avec cette méthode, utilise **`broadcast/stop-diffusion.bat`** (Windows) pour tout arrêter proprement d'un coup — sur Mac/Linux, un simple `Ctrl+C` suffit (le script s'occupe de tuer tous les processus en arrière-plan).
 
-## Contourner la limite de connexion à ~6 minutes de Render
-
-Render coupe les connexions longues (comme celle de ffmpeg vers `/source`) après une durée fixe, quelle que soit l'activité — ce n'est pas une panne, c'est une limite de la plateforme (plan gratuit). On ne peut pas la supprimer, mais on peut la devancer :
-
-Les scripts `broadcast/diffuser-*` utilisent maintenant `-t 300` avec ffmpeg : chaque connexion se referme **elle-même, proprement, après 5 minutes** — donc toujours avant que Render ne la coupe de force vers 6 minutes. Résultat : au lieu d'une coupure brutale et imprévisible (avec parfois plusieurs secondes avant que ffmpeg détecte l'erreur), on a une reconnexion propre, rapide et prévisible toutes les 5 minutes — quasi imperceptible pour les auditeurs (le lecteur web se reconnecte lui aussi automatiquement en moins d'une seconde).
-
-⚠️ Ce n'est pas parfait : il y aura toujours un micro-blanc (le temps d'une reconnexion réseau, en général bien moins d'une seconde) toutes les 5 minutes. Pour l'éliminer complètement, il faudrait soit passer sur un serveur sans cette limite de durée (VPS classique, voir plus haut, ou plan payant Render), soit repenser l'architecture en flux segmenté façon HLS (bien plus complexe à mettre en place) — dis-le-moi si tu veux qu'on explore cette voie plus tard.
+⚠️ **Point en observation** : avec VoiceMeeter, ce chevauchement (deux `ffmpeg` lisant le même périphérique audio virtuel pendant 40s) peut faire dériver la latence de plusieurs dizaines de secondes au fil des cycles. À surveiller — une version alternative en connexions séquentielles (sans chevauchement, latence stable mais ~1s de blanc toutes les 5 min) est prête si besoin d'y revenir.
 
 ## Empêcher la mise en veille de Render (auto-ping)
 
