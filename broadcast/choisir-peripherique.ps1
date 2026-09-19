@@ -5,6 +5,10 @@
 #  ton choix pour que diffuser-windows.bat l'utilise ensuite.
 # ============================================================
 
+# Force l'encodage UTF-8 pour un affichage correct des accents dans la console
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $ErrorActionPreference = 'SilentlyContinue'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $deviceFile = Join-Path $scriptDir 'device.txt'
@@ -64,8 +68,14 @@ $output = & $ffmpegCmd -list_devices true -f dshow -i dummy 2>&1 | Out-String
 
 if (-not $output -or $output -notmatch 'audio') {
     Write-Host "[ERREUR] ffmpeg a bien ete trouve mais n'a pas reussi a lister les peripheriques." -ForegroundColor Red
-    Write-Host "Essaie de lancer cette commande toi-meme pour voir le message d'erreur exact :" -ForegroundColor Yellow
-    Write-Host "  `"$ffmpegCmd`" -list_devices true -f dshow -i dummy" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "--- Ce que ffmpeg a repondu exactement ---" -ForegroundColor Yellow
+    if ($output) {
+        Write-Host $output
+    } else {
+        Write-Host "(aucune reponse du tout — le programme a peut-etre plante ou n'a rien renvoye)"
+    }
+    Write-Host "-------------------------------------------" -ForegroundColor Yellow
     Read-Host "Appuie sur Entree pour fermer"
     exit 1
 }
