@@ -1,9 +1,12 @@
 @echo off
 REM ============================================================
 REM  RADIO TV AN'NY TANTSAHA — Script de diffusion (Windows)
-REM  Envoie le son (via cable audio virtuel) vers NOTRE serveur,
-REM  avec des connexions qui SE CHEVAUCHENT : une nouvelle demarre
-REM  avant que l'ancienne ne se termine, donc plus AUCUN vide.
+REM  Envoie le son (cable virtuel choisi via choisir-peripherique.bat)
+REM  vers NOTRE serveur, avec des connexions qui SE CHEVAUCHENT : une
+REM  nouvelle demarre avant que l'ancienne ne se termine, donc plus
+REM  AUCUN vide.
+REM  -> Pas encore choisi de peripherique ? Lance d'abord
+REM     choisir-peripherique.bat (detection automatique + liste).
 REM ============================================================
 
 REM --- 1. A ADAPTER ---
@@ -15,7 +18,19 @@ REM    set SERVER_URL=https://tantsaha-radio-xxxx.onrender.com
 set SERVER_URL=https://radio-tantsaha.onrender.com
 
 set SOURCE_PASSWORD=tantsaha_source_2026
-set INPUT_DEVICE=Voicemeeter Out B1 (VB-Audio Voicemeeter VAIO)
+
+REM Le peripherique audio est choisi via choisir-peripherique.bat, qui
+REM enregistre ton choix dans device.txt. S'il n'existe pas encore,
+REM on te demande de le lancer d'abord.
+set DEVICE_FILE=%~dp0device.txt
+if not exist "%DEVICE_FILE%" (
+    echo [!] Aucun peripherique audio choisi pour le moment.
+    echo     Lance d'abord choisir-peripherique.bat pour en selectionner un
+    echo     ^(par exemple le cable virtuel dans lequel RadioBOSS envoie son son^).
+    pause
+    exit /b 1
+)
+set /p INPUT_DEVICE=<"%DEVICE_FILE%"
 
 where ffmpeg >nul 2>nul
 if %errorlevel% neq 0 (

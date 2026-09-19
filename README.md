@@ -48,37 +48,51 @@ Ouvre `http://localhost:8000/` dans ton navigateur : tu dois voir le lecteur (le
 
 ---
 
-## Étape 2 — Installer le câble audio virtuel
+## Étape 2 — Installer un câble audio virtuel
 
-C'est ce qui permet de "capturer" ce que joue ton PC pour l'envoyer au serveur.
+C'est ce qui permet de capter la sortie audio de **RadioBOSS** (ou de n'importe quel logiciel) pour l'envoyer au serveur, sans toucher au son du reste du PC.
 
-- **Windows** → [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) (gratuit)
+- **Windows** → [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) (gratuit, plus simple et plus fiable que VoiceMeeter pour ce besoin précis)
 - **macOS** → [BlackHole 2ch](https://existential.audio/blackhole/) (gratuit)
 - **Linux** → `pactl load-module module-null-sink sink_name=virtual-cable`
 
-Mets ensuite ce câble virtuel comme sortie audio par défaut de ton PC (ou route ton logiciel de diffusion vers lui) : le son ne sort plus par les haut-parleurs, il passe "dans le câble", prêt à être capté par ffmpeg.
+**Important** : n'installe pas VoiceMeeter et ne change pas la sortie audio de Windows entière. Va plutôt dans les **paramètres audio de RadioBOSS lui-même** (Settings → Options → Player/Output selon la version) et choisis **"CABLE Input (VB-Audio Virtual Cable)"** comme périphérique de sortie. Comme ça, seul le son de RadioBOSS part dans le câble — le reste de ton PC continue de sonner normalement sur tes vrais haut-parleurs.
 
 ---
 
-## Étape 3 — Lancer la diffusion (ffmpeg → notre serveur)
+## Étape 3 — Choisir le périphérique et lancer la diffusion
 
-Le serveur doit déjà tourner (étape 1). Ensuite :
-
-1. Ouvre `broadcast/diffuser-windows.bat` (ou `diffuser-mac-linux.sh`) et vérifie :
-   - `INPUT_DEVICE` : nom exact de ton câble virtuel
-     - Windows : `ffmpeg -list_devices true -f dshow -i dummy`
-     - Linux : `pactl list sources short`
-   - `SOURCE_PASSWORD` : le même que dans `server.js`
-2. Lance le script (double-clic, ou `chmod +x diffuser-mac-linux.sh && ./diffuser-mac-linux.sh` sur Mac/Linux).
-3. Dans le terminal du serveur (étape 1), tu dois voir apparaître :
+1. Double-clique sur **`broadcast/choisir-peripherique.bat`** : il détecte automatiquement tous les périphériques audio disponibles, les affiche dans une liste numérotée (le câble virtuel est repéré automatiquement avec une étoile ★), et enregistre ton choix.
+2. Vérifie dans `broadcast/diffuser-windows.bat` que `SOURCE_PASSWORD` correspond bien à celui du serveur (`tantsaha_source_2026` par défaut, déjà pré-rempli).
+3. Double-clique sur **`broadcast/diffuser-windows.bat`** pour lancer la diffusion.
+4. Dans les logs du serveur (Render, onglet "Logs"), tu dois voir apparaître :
    ```
    🔴 Diffusion DÉMARRÉE — flux audio en direct
    ```
 
-Retourne sur `http://localhost:8000/`, clique sur le soleil : tu t'écoutes en direct, via ton propre serveur.
+Ouvre ton lien Render, clique sur le soleil : tu entends RadioBOSS en direct.
+
+Pour changer de périphérique plus tard (si tu branches un nouveau micro, changes de logiciel, etc.), relance simplement `choisir-peripherique.bat` — pas besoin de modifier quoi que ce soit à la main.
+
+### Alternative : RadioBOSS en connexion directe (sans câble ni ffmpeg)
+
+RadioBOSS a aussi un système de diffusion Icecast intégré (Settings → Options → Broadcast) qui peut se connecter **directement** à notre serveur, sans passer par un câble virtuel ni ffmpeg :
+
+| Champ | Valeur |
+|---|---|
+| Type de serveur | Icecast |
+| Adresse serveur | `radio-tantsaha.onrender.com` (sans `https://`) |
+| Port | `443` |
+| SSL/TLS | Activé |
+| Point de montage | `/source` |
+| Nom d'utilisateur | `source` (ou vide) |
+| Mot de passe | `tantsaha_source_2026` |
+| Format / Bitrate / Fréquence | MP3 / 320 kbps / 48000 Hz |
+
+⚠️ Non testé en conditions réelles — certains encodeurs Icecast ne supportent pas le SSL/TLS, nécessaire ici car Render n'expose que du HTTPS. Si RadioBOSS affiche une erreur de connexion, reste simplement sur la méthode câble virtuel + ffmpeg ci-dessus, qui elle est garantie de fonctionner.
 
 ### Comment ça marche techniquement
-ffmpeg envoie le flux MP3 en `HTTP PUT` (avec transfert "chunked", donc sans taille connue à l'avance) vers `/source?key=...`. Notre serveur lit ces morceaux au fil de l'eau avec l'API `http` native de Node, et les recopie immédiatement dans la réponse HTTP de chaque auditeur connecté sur `/stream` — un `<audio>` HTML lit ça comme un flux continu, exactement comme il lirait un fichier MP3.
+ffmpeg envoie le flux MP3 en `HTTP PUT` (avec transfert "chunked", donc sans taille connue à l'avance) vers `/source?key=...` (ou via authentification Icecast standard si RadioBOSS s'y connecte directement). Notre serveur lit ces morceaux au fil de l'eau avec l'API `http` native de Node, et les recopie immédiatement dans la réponse HTTP de chaque auditeur connecté sur `/stream` — un `<audio>` HTML lit ça comme un flux continu, exactement comme il lirait un fichier MP3.
 
 ---
 

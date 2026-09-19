@@ -46,6 +46,26 @@ function log(...args) {
   console.log(`[${new Date().toLocaleTimeString()}]`, ...args);
 }
 
+// Accepte le mot de passe de diffusion de deux façons :
+//  1) ?key=... dans l'URL (méthode simple, historique de ce projet)
+//  2) Authorization: Basic ... (le VRAI protocole Icecast standard,
+//     utilisé nativement par RadioBOSS et la plupart des logiciels de
+//     diffusion pro — nom d'utilisateur ignoré, seul le mot de passe
+//     après les ':' compte, pour rester compatible quel que soit ce
+//     que le logiciel envoie comme nom d'utilisateur).
+function extractSourcePassword(req, query) {
+  if (query.get('key')) return query.get('key');
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Basic ')) {
+    try {
+      const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
+      const sep = decoded.indexOf(':');
+      if (sep !== -1) return decoded.slice(sep + 1);
+    } catch (e) { /* ignoré : sera rejeté par le contrôle du mot de passe */ }
+  }
+  return null;
+}
+
 // ---------------------- Gestion de la source (le diffuseur) ----------------------
 // Supporte la "relève sans coupure" : si une nouvelle connexion source arrive
 // pendant qu'une autre diffuse déjà, on ne la rejette plus (409) — on la
@@ -56,8 +76,8 @@ function log(...args) {
 // que le script de diffusion démarre la nouvelle connexion un peu avant
 // que l'ancienne n'atteigne sa limite de durée (-t) côté ffmpeg.
 function handleSource(req, res, query) {
-  if (query.get('key') !== SOURCE_PASSWORD) {
-    res.writeHead(401, { 'Content-Type': 'text/plain' });
+  if (extractSourcePassword(req, query) !== SOURCE_PASSWORD) {
+    res.writeHead(401, { 'Content-Type': 'text/plain', 'WWW-Authenticate': 'Basic realm="Radio"' });
     res.end('Mot de passe de diffusion invalide.');
     log('Tentative de connexion refusée (mauvais mot de passe)');
     return;
@@ -231,7 +251,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if ((req.method === 'PUT' || req.method === 'POST') && url.pathname === '/source') {
+  // On accepte n'importe quel nom de point de montage (RadioBOSS laisse
+  // l'utilisateur choisir le sien) et les 3 méthodes possibles pour un
+  // client Icecast : PUT (protocole standard moderne), POST, et SOURCE
+  // (ancien protocole Icecast, encore utilisé par certains logiciels en
+  // repli si PUT échoue).
+  if (req.method === 'PUT' || req.method === 'POST' || req.method === 'SOURCE') {
     return handleSource(req, res, url.searchParams);
   }
 
